@@ -264,6 +264,36 @@ static struct kprobe input_event_kp = {
 	.pre_handler = input_handle_event_handler_pre,
 };
 
+static int input_handle_event_handler2_pre(struct kprobe *p,
+										  struct pt_regs *regs)
+{
+	unsigned int type = (unsigned int)regs->regs[1];
+//	unsigned int code = (unsigned int)regs->regs[2];
+//	int value = (int)regs->regs[3];
+
+	struct input_handle* handle = (struct input_handle*)regs->regs[0];
+	if(!handle) {
+		return 0;
+	}
+
+//	if (type == EV_ABS) {
+//		pr_info("[ovo] input_inject_event(%u, %u, %d)", type, code, value);
+//	}
+
+	if (type != EV_SYN) {
+		return 0;
+	}
+
+	handle_cache_events(handle->dev);
+	return 0;
+}
+
+static struct kprobe input_inject_event_kp = {
+	.symbol_name = "input_inject_event",
+	.pre_handler = input_handle_event_handler2_pre,
+};
+
+/*
 // void input_mt_sync_frame(struct input_dev *dev)
 static int input_mt_sync_frame_pre(struct kprobe *p, struct pt_regs *regs) {
 	struct input_dev* dev = (struct input_dev*)regs->regs[0];
@@ -279,6 +309,7 @@ static struct kprobe input_mt_sync_frame_kp = {
 	.symbol_name = "input_mt_sync_frame",
 	.pre_handler = input_mt_sync_frame_pre,
 };
+*/
 
 int init_input_dev(void) {
 	int ret;
@@ -287,12 +318,21 @@ int init_input_dev(void) {
 	if (ret) {
 		return ret;
 	}
-
-	ret = register_kprobe(&input_mt_sync_frame_kp);
-	if(ret) {
+	
+	ret = register_kprobe(&input_inject_event_kp);
+	pr_info("[ovo] input_inject_event_kp: %d\n", ret);
+	if (ret) {
 		unregister_kprobe(&input_event_kp);
 		return ret;
 	}
+/*	
+	ret = register_kprobe(&input_mt_sync_frame_kp);
+	if(ret) {
+		unregister_kprobe(&input_event_kp);
+		unregister_kprobe(&input_inject_event_kp);
+		return ret;
+	}
+*/
 
 	if(my_input_handle_event == NULL) {
 		my_input_handle_event = (void (*)(struct input_dev *, unsigned int, unsigned int, int))ovo_kallsyms_lookup_name("input_handle_event");
@@ -306,7 +346,8 @@ int init_input_dev(void) {
 	pool = kvmalloc(sizeof(struct event_pool), GFP_KERNEL);
 	if (!pool) {
 		unregister_kprobe(&input_event_kp);
-		unregister_kprobe(&input_mt_sync_frame_kp);
+		unregister_kprobe(&input_inject_event_kp);
+//		unregister_kprobe(&input_mt_sync_frame_kp);
 		return -ENOMEM;
 	}
 	pool->size = 0;
@@ -317,7 +358,8 @@ int init_input_dev(void) {
 
 void exit_input_dev(void) {
 	unregister_kprobe(&input_event_kp);
-	unregister_kprobe(&input_mt_sync_frame_kp);
+	unregister_kprobe(&input_inject_event_kp);
+//	unregister_kprobe(&input_mt_sync_frame_kp);
 	if (pool)
 		kfree(pool);
 }
