@@ -6,28 +6,14 @@ on:
 jobs:
   build:
     name: GKI Kernel Module Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: upload-artifact
-    env:
-      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
-      CCACHE_NOHASHDIR: "true"
-      CCACHE_HARDLINK: "true"
     strategy:
-      fail-fast: false
       matrix:
-        include:
-          - version: 5.15.158
-            tag: android14-5.15
-            patch-level: 2024-08
-            arch: aarch64
-          - version: 6.1.75
-            tag: android14-6.1
-            patch-level: 2024-05
-            arch: aarch64
-          - version: 6.1.115
-            tag: android14-6.1
-            patch-level: 2024-11
-            arch: aarch64
+        tag:
+          - android14-6.1
+        arch:
+          - aarch64
           
     steps:
       - name: Maximize build space
@@ -39,7 +25,6 @@ jobs:
           remove-android: 'true'
           remove-haskell: 'true'
           remove-codeql: 'true'
-          remove-docker-images: 'true'
 
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -48,16 +33,13 @@ jobs:
         uses: ./
         with:
           arch: ${{ matrix.arch }}
-          tag: ${{ matrix.tag }}-${{ matrix.patch-level }}
-          simple-tag: ${{ matrix.tag }}
-          version: ${{ matrix.version }}
-          fast_build: false
+          tag: ${{ matrix.tag }}
           module-name: ovo
           module-path: ovo
 
   upload-artifact:
     name: Upload LKM Source Code
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
